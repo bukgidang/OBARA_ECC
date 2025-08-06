@@ -194,19 +194,19 @@ function drawCustomGraph() {
 
   let datasets = [
     {
-      label: `TR E.C.C (빨간 점선, ${tr}A)`,
+      label: `TR (${tr}A)`,
       data: trData, borderColor: "red", borderWidth:3, fill:false,
       tension: 0.2, borderDash:[8,8], pointRadius:0
     },
     {
-      label: `DIODE E.C.C×${diodeCnt} (초록 점선, ${diode}A × ${diodeCnt} = ${diodeTotal}A)`,
+      label: `DIODE${diodeCnt} (${diode}A × ${diodeCnt} = ${diodeTotal}A)`,
       data: diodeData, borderColor: "green", borderWidth:3, fill:false,
       tension: 0.2, borderDash:[8,8], pointRadius:0
     }
   ];
   if(calcData) {
     datasets.push({
-      label:`ECC (노란 실선${calcInfo})`,
+      label:`ECC (${calcInfo})`,
       data: calcData, borderColor:"gold", borderWidth:3, fill:false,
       tension:0.2, borderDash:[], pointRadius:0
     });
@@ -299,3 +299,4 @@ window.onload = () => { calculateAndDraw(); };
 </script>
 </body>
 </html>
+
