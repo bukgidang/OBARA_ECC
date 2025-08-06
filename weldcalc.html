@@ -141,11 +141,12 @@ let lastCalcParams = {};
 let lastSpecialPoint = null;
 let lastECCJudge = null;
 
+// 전류 미입력/0 입력 시 시간란 자동 비활성화
 function toggleTimeInput(num) {
-  const cVal = Number(document.getElementById('current'+num).value);
+  const cVal = document.getElementById('current'+num).value;
   const tInput = document.getElementById('time'+num);
-  tInput.disabled = !cVal;
-  if(!cVal) tInput.value = "";
+  if(cVal !== "" && !isNaN(Number(cVal)) && Number(cVal)!=0) tInput.disabled = false;
+  else { tInput.value = ""; tInput.disabled = true; }
 }
 
 function calculate() {
@@ -170,7 +171,6 @@ function calculate() {
     resetCalcVars();
     return;
   }
-
   if(totalTime === 0){
     document.getElementById('result').innerText = "전체 시간은 0이 될 수 없습니다.";
     resetCalcVars();
@@ -457,8 +457,8 @@ function drawCustomGraph() {
   });
 }
 
-window.onload = () => {
-  // 최초에도 입력상태에 맞게 time란 비활성화
+// 반드시 초기 구동시에도 입력 상태 맞춰 시간란 활성/비활성
+window.onload = function() {
   toggleTimeInput(1); toggleTimeInput(2); toggleTimeInput(3);
   calculateAndDraw();
 };
