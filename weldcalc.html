@@ -74,3 +74,368 @@
     #okng-label {
       display: none;
       position: absolute;
+      font-size: 1.35em;
+      font-weight: bold;
+      pointer-events: none;
+      user-select: none;
+      z-index: 9;
+      text-shadow: 0 1.5px 4px #fff, 0 0 2px #000;
+    }
+    @media (max-width:600px) {
+      html, body { font-size: 15px;}
+      #chart-area { height: 360px; min-width:0;}
+      #eccChart { height:340px !important; min-height:200px !important;}
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2 style="font-size:1.35em;">E.C.C CACULATOR</h2>
+
+  <!-- 기본 계산기 입력 영역 -->
+  <label>용접전류1 (A): <input type="number" id="current1" placeholder="예: 1200" autocomplete="off" /></label>
+  <label>용접전류2 (A): <input type="number" id="current2" placeholder="예: 1100" autocomplete="off" /></label>
+  <label>용접전류3 (A): <input type="number" id="current3" placeholder="예: 1300" autocomplete="off" /></label>
+  <label>용접시간1 (ms): <input type="number" id="time1" placeholder="예: 150" autocomplete="off" /></label>
+  <label>용접시간2 (ms): <input type="number" id="time2" placeholder="예: 200" autocomplete="off" /></label>
+  <label>용접시간3 (ms): <input type="number" id="time3" placeholder="예: 180" autocomplete="off" /></label>
+  <label>타점 수: <input type="number" id="count" placeholder="예: 10" autocomplete="off" /></label>
+  <label>전체 시간 (ms): <input type="number" id="totalTime" value="60000" autocomplete="off" /></label>
+
+  <!-- TR/DIODE 항목을 아래로 이동 배치 -->
+  <div id="ecc-compare-area" style="margin-top:14px;">
+    <label>TR E.C.C (A): <input type="number" id="trValue" value="5000" autocomplete="off" /></label>
+    <label>DIODE E.C.C (A):
+      <select id="diodeValue">
+        <option value="7110" selected>7110</option>
+        <option value="11000">11000</option>
+      </select>
+    </label>
+    <label>DIODE 개수:
+      <select id="diodeCount">
+        <option value="2" selected>2</option>
+        <option value="4">4</option>
+        <option value="8">8</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="button-group">
+    <button type="button" onclick="calculateAndDraw()">계산 및 그래프</button>
+    <button type="button" onclick="downloadTxt()">텍스트 파일로 저장</button>
+  </div>
+
+  <div class="result" id="result"></div>
+  <div id="ecc-point"></div>
+  <hr style="margin: 34px 0 18px 0; border: 0; border-top:1.5px solid #bbb;">
+
+  <div id="chart-area">
+    <canvas id="eccChart"></canvas>
+    <div id="okng-label"></div>
+  </div>
+
+<script>
+let chart = null;
+let lastCalcResult = null;
+let lastCalcParams = {};
+let lastSpecialPoint = null;
+let lastECCJudge = null;
+
+function calculate() {
+  const current1 = Number(document.getElementById('current1').value);
+  const current2 = Number(document.getElementById('current2').value);
+  const current3 = Number(document.getElementById('current3').value);
+  const time1 = Number(document.getElementById('time1').value);
+  const time2 = Number(document.getElementById('time2').value);
+  const time3 = Number(document.getElementById('time3').value);
+  const count = Number(document.getElementById('count').value);
+  const totalTime = Number(document.getElementById('totalTime').value);
+
+  if(totalTime === 0){
+    document.getElementById('result').innerText = "전체 시간은 0이 될 수 없습니다.";
+    lastCalcResult = null;
+    lastCalcParams = {};
+    lastSpecialPoint = null;
+    lastECCJudge = null;
+    document.getElementById('ecc-point').innerText = '';
+    return;
+  }
+
+  const innerSum = (current1 ** 2) * time1 + (current2 ** 2) * time2 + (current3 ** 2) * time3;
+  const value = Math.sqrt((count / totalTime) * innerSum);
+  lastCalcResult = value;
+  lastCalcParams = {
+    current1, current2, current3,
+    time1, time2, time3,
+    count, totalTime
+  };
+
+  let specialStr = '';
+  const xval_percent = totalTime > 0 ? ((time1 + time2 + time3) * count / totalTime) * 100 : null;
+  let yval = null, trY = null, judgeMark = '', judgeColor = '';
+  if(xval_percent && xval_percent > 0 && lastCalcResult) {
+    yval = getCurrent(lastCalcResult, xval_percent);
+    const tr = Number(document.getElementById("trValue").value) || 0;
+    trY = getCurrent(tr, xval_percent);
+    if(xval_percent >= 1 && xval_percent <= 100) {
+      specialStr = `ECC 교차점: DUTY&nbsp;CYCLE&nbsp;=&nbsp;${xval_percent.toFixed(2)}%&nbsp;&nbsp;,&nbsp;&nbsp;CURRENT&nbsp;=&nbsp;${Math.round(yval).toLocaleString()}A`;
+      if (yval > trY) {
+        judgeMark = "NG";
+        judgeColor = "#e84c4c";
+      } else {
+        judgeMark = "OK";
+        judgeColor = "#2ab45d";
+      }
+      lastECCJudge = { mark: judgeMark, color: judgeColor, x: xval_percent, y: yval };
+    } else {
+      specialStr = "ECC 교차점: (그래프 영역 [1~100%] 외)";
+      lastECCJudge = null;
+    }
+    lastSpecialPoint = { x: xval_percent, y: yval };
+  } else {
+    lastSpecialPoint = null;
+    lastECCJudge = null;
+    specialStr = '';
+  }
+  document.getElementById('ecc-point').innerHTML = specialStr;
+  document.getElementById('result').innerText =
+    `ECC = √[ (타점 수 / 전체 시간) × (전류1²×시간1 + 전류2²×시간2 + 전류3²×시간3) ] = ${value.toFixed(3)} A
+
+입력값 요약:
+- 용접전류1: ${current1} A
+- 용접전류2: ${current2} A
+- 용접전류3: ${current3} A
+- 용접시간1: ${time1} ms
+- 용접시간2: ${time2} ms
+- 용접시간3: ${time3} ms
+- 타점 수: ${count}
+- 전체 시간: ${totalTime} ms`;
+}
+
+function downloadTxt() {
+  const current1 = document.getElementById('current1').value;
+  const current2 = document.getElementById('current2').value;
+  const current3 = document.getElementById('current3').value;
+  const time1 = document.getElementById('time1').value;
+  const time2 = document.getElementById('time2').value;
+  const time3 = document.getElementById('time3').value;
+  const count = document.getElementById('count').value;
+  const totalTime = document.getElementById('totalTime').value;
+
+  const innerSum = (current1 ** 2) * time1 + (current2 ** 2) * time2 + (current3 ** 2) * time3;
+  const value = Math.sqrt((count / totalTime) * innerSum);
+
+  const text =
+`용접전류1: ${current1} A
+용접전류2: ${current2} A
+용접전류3: ${current3} A
+용접시간1: ${time1} ms
+용접시간2: ${time2} ms
+용접시간3: ${time3} ms
+타점 수: ${count}
+전체 시간: ${totalTime} ms
+
+ECC = √[ (타점 수 / 전체 시간) × (전류1²×시간1 + 전류2²×시간2 + 전류3²×시간3) ] = ${value.toFixed(3)} A
+`;
+
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "weld_result.txt";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function getCurrent(tr, duty) {
+  return tr * 10 / Math.sqrt(duty);
+}
+
+function calculateAndDraw() {
+  calculate();
+  drawCustomGraph();
+}
+
+function drawCustomGraph() {
+  const tr = Number(document.getElementById("trValue").value);
+  const diode = Number(document.getElementById("diodeValue").value);
+  const diodeCnt = Number(document.getElementById("diodeCount").value);
+  if (!tr || !diode || !diodeCnt) {
+    alert("TR E.C.C, DIODE E.C.C, DIODE 개수 모두 입력해 주세요.");
+    return;
+  }
+  const duty = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+  const trData = duty.map(d => getCurrent(tr, d));
+  const diodeTotal = diode * diodeCnt;
+  const diodeData = duty.map(d => getCurrent(diodeTotal, d));
+
+  let calcData = null, calcInfo = "";
+  if(lastCalcResult && !isNaN(lastCalcResult)) {
+    calcData = duty.map(d => getCurrent(lastCalcResult, d));
+    calcInfo = `, ECC(${lastCalcResult.toFixed(1)}A)`;
+  }
+
+  let specialPoint = null;
+  if(lastSpecialPoint && lastSpecialPoint.x && lastSpecialPoint.y && lastSpecialPoint.x >= 1 && lastSpecialPoint.x <= 100) {
+    specialPoint = lastSpecialPoint;
+  }
+  const ctx = document.getElementById("eccChart").getContext("2d");
+  if(chart) chart.destroy();
+
+  let datasets = [
+    {
+      label: `TR E.C.C (빨간 점선, ${tr}A)`,
+      data: trData,
+      borderColor: "red",
+      borderWidth: 3,
+      fill: false,
+      tension: 0.2,
+      borderDash: [8, 8],
+      pointRadius: 0
+    },
+    {
+      label: `DIODE E.C.C×${diodeCnt} (초록 점선, ${diode}A × ${diodeCnt} = ${diodeTotal}A)`,
+      data: diodeData,
+      borderColor: "green",
+      borderWidth: 3,
+      fill: false,
+      tension: 0.2,
+      borderDash: [8, 8],
+      pointRadius: 0
+    }
+  ];
+  if(calcData) {
+    datasets.push({
+      label: `ECC (노란 실선${calcInfo})`,
+      data: calcData,
+      borderColor: "gold",
+      borderWidth: 3,
+      fill: false,
+      tension: 0.2,
+      borderDash: [],
+      pointRadius: 0
+    });
+  }
+  if(specialPoint) {
+    datasets.push({
+      type: 'scatter',
+      label: 'ECC교차점',
+      data: [{x: specialPoint.x, y: specialPoint.y}],
+      backgroundColor: 'gold',
+      pointRadius: 6,
+      showLine: false
+    });
+    datasets.push({
+      type: 'line',
+      label: '',
+      data: [{x: specialPoint.x, y: specialPoint.y}, {x: specialPoint.x, y: 0}],
+      borderColor: 'gold',
+      borderWidth: 2,
+      borderDash: [4,4],
+      pointRadius: 0,
+      fill: false,
+      tension: 0
+    });
+    datasets.push({
+      type: 'line',
+      label: '',
+      data: [{x: 1, y: specialPoint.y}, {x: specialPoint.x, y: specialPoint.y}],
+      borderColor: 'gold',
+      borderWidth: 2,
+      borderDash: [4,4],
+      pointRadius: 0,
+      fill: false,
+      tension: 0
+    });
+  }
+
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: duty,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {display: true, position:'top'},
+        title: {display: true, text: "DUTY CYCLE (%)에 따른 CURRENT (A)"},
+        tooltip: {enabled: true}
+      },
+      layout: { padding: { right: 30, left:10, top:4, bottom:4 } },
+      scales: {
+        x: {
+          type: 'logarithmic',
+          min: 1,
+          max: 100,
+          title: {display: true, text: "DUTY CYCLE [%]"},
+          ticks: {
+            callback: function(v) {
+              if (v === 1 || v === 10 || v === 100) return v;
+              else return '';
+            },
+            major: {enabled: true}
+          },
+          grid: {
+            color: (ctx) => {
+              if(ctx.tick.value===1 || ctx.tick.value===10 || ctx.tick.value===100) return '#000';
+              return '#bbb';
+            },
+            borderDash: (ctx) => (ctx.tick.value===1 || ctx.tick.value===10 || ctx.tick.value===100) ? [] : [2,3]
+          }
+        },
+        y: {
+          min: 0,
+          max: 60000,
+          title: {display: true, text: "CURRENT (A)"},
+          ticks: {
+            stepSize: 1000,
+            callback: function(value) {
+              if (value % 5000 === 0) return value;
+              else return "";
+            },
+            major: {enabled: true}
+          },
+          grid: {
+            color: (ctx) => (+ctx.tick.value%5000===0 ? "#000" : "#ccc"),
+            lineWidth: (ctx) => (+ctx.tick.value%5000===0 ? 1.8 : 0.7),
+            borderDash: (ctx) => (+ctx.tick.value%5000===0 ? [] : [3,4])
+          }
+        }
+      },
+      animation: {
+        onComplete: function() {
+          // OK/NG 마크 표시
+          const labelDiv = document.getElementById('okng-label');
+          labelDiv.style.display = 'none';
+          if(lastECCJudge && chart && specialPoint) {
+            const xval = specialPoint.x, yval = specialPoint.y;
+            const meta = chart.scales;
+            let xp = meta.x.getPixelForValue(xval||1);
+            let yp = meta.y.getPixelForValue(yval||0);
+            let mark = lastECCJudge.mark;
+            let color = lastECCJudge.color;
+            xp = Math.min(Math.max(xp-35, 2), ctx.canvas.clientWidth-36);
+            yp = Math.max(yp-34, 4);
+            labelDiv.innerHTML = mark;
+            labelDiv.style.color = color;
+            labelDiv.style.left = xp + 'px';
+            labelDiv.style.top = yp + 'px';
+            labelDiv.style.display = 'block';
+          }
+        }
+      }
+    }
+  });
+}
+
+window.onload = () => {
+  calculateAndDraw();
+};
+</script>
+</body>
+</html>
