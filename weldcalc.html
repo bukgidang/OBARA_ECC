@@ -23,7 +23,7 @@
     }
     .button-group button:hover { background: #256ce6;}
     .result { margin-top: 22px; font-size: 1.13em; color: #1457a7;
-      white-space: pre-line; word-break: break-all; }
+      white-space: pre-line; word-break: break-all; display: none; }
     #ecc-point { margin: 19px 0 10px 0; color: #c89300; font-weight: bold; font-size: 1.15em; word-break: break-all;}
     #chart-area {
       margin-top: 32px; width: 100%; min-width:0; position:relative;
@@ -104,16 +104,16 @@ function calculate() {
   const totalTime = Number(document.getElementById('totalTime').value);
 
   if(totalTime === 0){
-    document.getElementById('result').innerText = "전체 시간은 0이 될 수 없습니다.";
+    // 입력값 요약 화면 미노출
     lastCalcResult = null; lastCalcParams = {}; lastSpecialPoint = null; lastECCJudge = null;
     document.getElementById('ecc-point').innerText = '';
+    document.getElementById('result').style.display = 'none';
     return;
   }
   const innerSum = (current1 ** 2) * time1 + (current2 ** 2) * time2 + (current3 ** 2) * time3;
   const value = Math.sqrt((count / totalTime) * innerSum);
   lastCalcResult = value;
   lastCalcParams = {current1, current2, current3, time1, time2, time3, count, totalTime};
-
   let specialStr = '';
   const xval_percent = totalTime > 0 ? ((time1 + time2 + time3) * count / totalTime) * 100 : null;
   let yval = null, trY = null, judgeMark = '', judgeColor = '';
@@ -135,18 +135,7 @@ function calculate() {
     lastSpecialPoint = null; lastECCJudge = null; specialStr = '';
   }
   document.getElementById('ecc-point').innerHTML = specialStr;
-  document.getElementById('result').innerText =
-    `ECC = √[ (타점 수 / 전체 시간) × (전류1²×시간1 + 전류2²×시간2 + 전류3²×시간3) ] = ${value.toFixed(3)} A
-
-입력값 요약:
-- 용접전류1: ${current1} A
-- 용접전류2: ${current2} A
-- 용접전류3: ${current3} A
-- 용접시간1: ${time1} ms
-- 용접시간2: ${time2} ms
-- 용접시간3: ${time3} ms
-- 타점 수: ${count}
-- 전체 시간: ${totalTime} ms`;
+  document.getElementById('result').style.display = 'none';
 }
 function downloadTxt() {
   const current1 = document.getElementById('current1').value;
@@ -159,6 +148,7 @@ function downloadTxt() {
   const totalTime = document.getElementById('totalTime').value;
   const innerSum = (current1 ** 2) * time1 + (current2 ** 2) * time2 + (current3 ** 2) * time3;
   const value = Math.sqrt((count / totalTime) * innerSum);
+  // 입력값 요약/결과만 파일에 포함
   const text = `용접전류1: ${current1} A
 용접전류2: ${current2} A
 용접전류3: ${current3} A
@@ -243,7 +233,10 @@ function drawCustomGraph() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display:true },
+        legend: {
+          display:true,
+          position: 'right'  // ← 주석(범례) 오른쪽으로!
+        },
         title: { display:true, text: "DUTY CYCLE (%)에 따른 CURRENT (A)"},
         tooltip: { enabled:true }
       },
