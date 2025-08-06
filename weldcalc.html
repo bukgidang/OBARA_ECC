@@ -58,13 +58,13 @@
       position: relative;
       max-width: 100%;
       box-sizing: border-box;
-      height: 630px;      /* 1.5배 확장 (420x1.5=630) */
+      height: 630px;      /* 1.5배 확장 */
       min-height: 480px;
     }
     #eccChart {
       display: block;
       width: 100% !important;
-      height: 600px !important;  /* 1.5배 확장 (400x1.5=600) */
+      height: 600px !important;  /* 1.5배 확장 */
       min-height: 480px !important;
       max-width: 100%;
       background-color: #fff;
@@ -93,16 +93,16 @@
   <h2 style="font-size:1.35em;">E.C.C CACULATOR</h2>
 
   <!-- 기본 계산기 입력 영역 -->
-  <label>용접전류1 (A): <input type="number" id="current1" placeholder="예: 1200" autocomplete="off" /></label>
-  <label>용접전류2 (A): <input type="number" id="current2" placeholder="예: 1100" autocomplete="off" /></label>
-  <label>용접전류3 (A): <input type="number" id="current3" placeholder="예: 1300" autocomplete="off" /></label>
-  <label>용접시간1 (ms): <input type="number" id="time1" placeholder="예: 150" autocomplete="off" /></label>
-  <label>용접시간2 (ms): <input type="number" id="time2" placeholder="예: 200" autocomplete="off" /></label>
-  <label>용접시간3 (ms): <input type="number" id="time3" placeholder="예: 180" autocomplete="off" /></label>
+  <label>용접전류1 (A): <input type="number" id="current1" placeholder="예: 1200" autocomplete="off" oninput="toggleTimeInput(1)" /></label>
+  <label>용접시간1 (ms): <input type="number" id="time1" placeholder="예: 150" autocomplete="off" disabled /></label>
+  <label>용접전류2 (A): <input type="number" id="current2" placeholder="예: 1100" autocomplete="off" oninput="toggleTimeInput(2)" /></label>
+  <label>용접시간2 (ms): <input type="number" id="time2" placeholder="예: 200" autocomplete="off" disabled /></label>
+  <label>용접전류3 (A): <input type="number" id="current3" placeholder="예: 1300" autocomplete="off" oninput="toggleTimeInput(3)" /></label>
+  <label>용접시간3 (ms): <input type="number" id="time3" placeholder="예: 180" autocomplete="off" disabled /></label>
   <label>타점 수: <input type="number" id="count" placeholder="예: 10" autocomplete="off" /></label>
   <label>전체 시간 (ms): <input type="number" id="totalTime" value="60000" autocomplete="off" /></label>
 
-  <!-- TR/DIODE 항목을 아래로 이동 배치 -->
+  <!-- TR/DIODE 항목 -->
   <div id="ecc-compare-area" style="margin-top:14px;">
     <label>TR E.C.C (A): <input type="number" id="trValue" value="5000" autocomplete="off" /></label>
     <label>DIODE E.C.C (A):
@@ -141,6 +141,13 @@ let lastCalcParams = {};
 let lastSpecialPoint = null;
 let lastECCJudge = null;
 
+function toggleTimeInput(num) {
+  const cVal = Number(document.getElementById('current'+num).value);
+  const tInput = document.getElementById('time'+num);
+  tInput.disabled = !cVal;
+  if(!cVal) tInput.value = "";
+}
+
 function calculate() {
   const current1 = Number(document.getElementById('current1').value);
   const current2 = Number(document.getElementById('current2').value);
@@ -151,13 +158,22 @@ function calculate() {
   const count = Number(document.getElementById('count').value);
   const totalTime = Number(document.getElementById('totalTime').value);
 
+  // 사용률 체크
+  const usage = totalTime > 0 ? ((time1 + time2 + time3) * count / totalTime) * 100 : 0;
+  if (usage > 100) {
+    document.getElementById('result').innerText = "⚠️ 사용률이 100%를 넘을 수 없습니다.";
+    resetCalcVars();
+    return;
+  }
+  if (usage > 0 && usage <= 1) {
+    document.getElementById('result').innerText = "⚠️ 사용률이 1% 이하로 너무 낮아 계산할 수 없습니다.";
+    resetCalcVars();
+    return;
+  }
+
   if(totalTime === 0){
     document.getElementById('result').innerText = "전체 시간은 0이 될 수 없습니다.";
-    lastCalcResult = null;
-    lastCalcParams = {};
-    lastSpecialPoint = null;
-    lastECCJudge = null;
-    document.getElementById('ecc-point').innerText = '';
+    resetCalcVars();
     return;
   }
 
@@ -210,6 +226,14 @@ function calculate() {
 - 용접시간3: ${time3} ms
 - 타점 수: ${count}
 - 전체 시간: ${totalTime} ms`;
+}
+
+function resetCalcVars() {
+  lastCalcResult = null;
+  lastCalcParams = {};
+  lastSpecialPoint = null;
+  lastECCJudge = null;
+  document.getElementById('ecc-point').innerText = '';
 }
 
 function downloadTxt() {
@@ -434,6 +458,8 @@ function drawCustomGraph() {
 }
 
 window.onload = () => {
+  // 최초에도 입력상태에 맞게 time란 비활성화
+  toggleTimeInput(1); toggleTimeInput(2); toggleTimeInput(3);
   calculateAndDraw();
 };
 </script>
