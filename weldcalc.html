@@ -28,14 +28,14 @@
     #chart-area {
       margin-top: 32px; width: 100%; min-width:0; position:relative;
       max-width: 100%; box-sizing: border-box;
-      height: 440px;    /* 고정 높이! (PC/모바일 둘 다 충분) */
-      min-height: 410px; max-height: 480px;
+      height: 440px;    /* 기본 공간 */
+      min-height: 370px; max-height: 600px;
     }
     #eccChart {
       display: block;
       width: 100% !important;
-      height: 420px !important;   /* ← 그래프 본체 크기 고정 */
-      min-height: 410px !important;
+      height: 420px !important;
+      min-height: 370px !important;
       max-width: 100%;
       background-color: #fff;
       border-radius: 11px;
@@ -48,12 +48,12 @@
     }
     @media (max-width:700px) {
       html, body { font-size: 15.7px; }
-      #chart-area{ height: 340px; min-height:270px; max-height:390px;}
-      #eccChart { height: 320px !important; min-height: 260px !important;}
+      #chart-area{ height: 340px; min-height:230px; max-height:390px;}
+      #eccChart { height: 320px !important; min-height: 220px !important;}
     }
     @media (max-width:480px) {
-      #chart-area{ height: 230px; min-height:170px; max-height:260px;}
-      #eccChart { height: 210px !important; min-height: 150px !important;}
+      #chart-area{ height: 220px; min-height:170px; max-height:290px;}
+      #eccChart { height: 190px !important; min-height: 130px !important;}
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -104,7 +104,6 @@ function calculate() {
   const totalTime = Number(document.getElementById('totalTime').value);
 
   if(totalTime === 0){
-    // 입력값 요약 화면 미노출
     lastCalcResult = null; lastCalcParams = {}; lastSpecialPoint = null; lastECCJudge = null;
     document.getElementById('ecc-point').innerText = '';
     document.getElementById('result').style.display = 'none';
@@ -148,7 +147,6 @@ function downloadTxt() {
   const totalTime = document.getElementById('totalTime').value;
   const innerSum = (current1 ** 2) * time1 + (current2 ** 2) * time2 + (current3 ** 2) * time3;
   const value = Math.sqrt((count / totalTime) * innerSum);
-  // 입력값 요약/결과만 파일에 포함
   const text = `용접전류1: ${current1} A
 용접전류2: ${current2} A
 용접전류3: ${current3} A
@@ -194,19 +192,19 @@ function drawCustomGraph() {
 
   let datasets = [
     {
-      label: `TR (${tr}A)`,
+      label: `TR E.C.C (빨간 점선, ${tr}A)`,
       data: trData, borderColor: "red", borderWidth:3, fill:false,
       tension: 0.2, borderDash:[8,8], pointRadius:0
     },
     {
-      label: `DIODE${diodeCnt} (${diode}A × ${diodeCnt} = ${diodeTotal}A)`,
+      label: `DIODE E.C.C×${diodeCnt} (초록 점선, ${diode}A × ${diodeCnt} = ${diodeTotal}A)`,
       data: diodeData, borderColor: "green", borderWidth:3, fill:false,
       tension: 0.2, borderDash:[8,8], pointRadius:0
     }
   ];
   if(calcData) {
     datasets.push({
-      label:`ECC (${calcInfo})`,
+      label:`ECC (노란 실선${calcInfo})`,
       data: calcData, borderColor:"gold", borderWidth:3, fill:false,
       tension:0.2, borderDash:[], pointRadius:0
     });
@@ -233,9 +231,9 @@ function drawCustomGraph() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: {
+        legend: {          // ← 아래가 범례 옵션
           display:true,
-          position: 'right'  // ← 주석(범례) 오른쪽으로!
+          position: 'top'   // ← 초기화: 기본값(상단)
         },
         title: { display:true, text: "DUTY CYCLE (%)에 따른 CURRENT (A)"},
         tooltip: { enabled:true }
@@ -299,4 +297,3 @@ window.onload = () => { calculateAndDraw(); };
 </script>
 </body>
 </html>
-
